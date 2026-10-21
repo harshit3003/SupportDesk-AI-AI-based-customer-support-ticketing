@@ -7,7 +7,7 @@ export const STATUSES = ['open', 'pending', 'resolved', 'closed'];
 
 export const User = model('User', new Schema({
   name: String,
-  email: { type: String, unique: true, required: true },
+  email: { type: String, unique: true, required: true, lowercase: true, trim: true },
   passwordHash: { type: String, required: true },
   role: { type: String, enum: ['admin', 'agent'], default: 'agent' },
   skills: { type: [String], default: [] },
@@ -25,7 +25,7 @@ const messageSchema = new Schema({
 const ticketSchema = new Schema({
   subject: { type: String, required: true },
   body: { type: String, required: true },
-  customer: { name: String, email: { type: String, required: true } },
+  customer: { name: String, email: { type: String, required: true, lowercase: true, trim: true } },
   category: { type: String, enum: CATEGORIES, default: 'general' },
   priority: { type: String, enum: PRIORITIES, default: 'medium' },
   status: { type: String, enum: STATUSES, default: 'open' },

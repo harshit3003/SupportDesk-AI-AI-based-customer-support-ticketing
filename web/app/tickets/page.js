@@ -3,15 +3,17 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { api, fmtDate, label } from '../../lib/api';
 import { Badge } from '../../components/ui';
+import Guard from '../../components/Guard';
 
 const CATS = ['billing', 'technical', 'account', 'shipping', 'feature_request', 'general'];
 
-export default function Tickets() {
+function Tickets() {
   const [f, setF] = useState({ status: '', category: '', priority: '', mine: false, breached: false });
   const [rows, setRows] = useState([]);
+  const [err, setErr] = useState('');
   useEffect(() => {
     const qs = new URLSearchParams(Object.entries(f).filter(([, v]) => v)).toString();
-    api(`/tickets?${qs}`).then(setRows).catch(() => {});
+    api(`/tickets?${qs}`).then((r) => { setRows(r); setErr(''); }).catch((e) => setErr(e.message));
   }, [f]);
   const set = (k) => (e) => setF({ ...f, [k]: e.target.type === 'checkbox' ? e.target.checked : e.target.value });
   return (
@@ -24,6 +26,7 @@ export default function Tickets() {
         <label><input type="checkbox" checked={f.mine} onChange={set('mine')} /> Mine</label>
         <label><input type="checkbox" checked={f.breached} onChange={set('breached')} /> SLA breached</label>
       </div>
+      {err && <p className="err">{err}</p>}
       <div className="card">
         <table>
           <thead><tr><th>Subject</th><th>Category</th><th>Priority</th><th>Status</th><th>Assignee</th><th>Created</th></tr></thead>
@@ -45,3 +48,5 @@ export default function Tickets() {
     </>
   );
 }
+
+export default function Page() { return <Guard roles={['agent', 'admin']}><Tickets /></Guard>; }

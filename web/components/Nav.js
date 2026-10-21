@@ -1,22 +1,28 @@
 'use client';
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
+import { getUser } from '../lib/api';
 
-const LINKS = [['/', 'Overview'], ['/tickets', 'Tickets'], ['/agents', 'Agents'], ['/csat', 'Satisfaction']];
+const ADMIN = [['/', 'Overview'], ['/tickets', 'Tickets'], ['/agents', 'Agents'], ['/csat', 'Satisfaction']];
+const AGENT = [['/my', 'My workspace'], ['/tickets', 'Tickets']];
 
 export default function Nav() {
   const path = usePathname();
   const router = useRouter();
-  if (path === '/login' || path === '/submit' || path.startsWith('/rate')) return null;
+  const [user, setUser] = useState(null);
+  useEffect(() => { setUser(getUser()); }, [path]);
+  if (path === '/login' || path === '/submit' || path.startsWith('/rate') || !user) return null;
+  const links = user.role === 'admin' ? ADMIN : AGENT;
   return (
     <nav className="nav">
       <strong>SupportDesk AI</strong>
-      {LINKS.map(([href, text]) => (
+      {links.map(([href, text]) => (
         <Link key={href} href={href} className={path === href || (href !== '/' && path.startsWith(href)) ? 'active' : ''}>{text}</Link>
       ))}
       <span style={{ flex: 1 }} />
-      <Link href="/submit">Customer form ↗</Link>
-      <a href="#" onClick={(e) => { e.preventDefault(); localStorage.removeItem('token'); router.push('/login'); }}>Sign out</a>
+      <span className="muted small">{user.name} · {user.role}</span>
+      <a href="#" onClick={(e) => { e.preventDefault(); localStorage.clear(); router.push('/login'); }}>Sign out</a>
     </nav>
   );
 }

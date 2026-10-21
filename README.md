@@ -38,3 +38,4 @@ cd web && npm install && npm run dev
 
 ## Before production
 Change `JWT_SECRET`, move the token out of `localStorage` into an httpOnly cookie, add rate limiting on `/tickets/public`, sign the CSAT links, and add tests.
+

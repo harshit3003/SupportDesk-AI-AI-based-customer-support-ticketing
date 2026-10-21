@@ -15,8 +15,12 @@ app.use('/api/auth', authRoutes);
 app.use('/api/tickets', ticketRoutes);
 app.use('/api/analytics', analyticsRoutes);
 app.use((err, _req, res, _next) => {
+  if (err.type === 'entity.parse.failed') return res.status(400).json({ error: 'Invalid JSON body' });
+  if (err.name === 'CastError') return res.status(404).json({ error: 'Not found' });
+  if (err.name === 'ValidationError') return res.status(400).json({ error: err.message });
+  if (err.code === 11000) return res.status(409).json({ error: 'Already exists' });
   console.error(err);
-  res.status(err.name === 'ValidationError' ? 400 : 500).json({ error: err.message });
+  res.status(500).json({ error: 'Internal server error' });
 });
 
 const PORT = process.env.PORT || 4000;

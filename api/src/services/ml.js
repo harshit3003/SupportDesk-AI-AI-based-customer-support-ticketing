@@ -1,3 +1,5 @@
+import { CATEGORIES } from '../models.js';
+
 const ML_URL = process.env.ML_URL || 'http://localhost:8000';
 const LEVELS = ['low', 'medium', 'high', 'urgent'];
 
@@ -11,20 +13,26 @@ const KEYWORDS = {
 
 function keywordClassify(subject, body) {
   const text = `${subject} ${body}`.toLowerCase();
+  // Whole-word matching so e.g. "download" doesn't trip "down" and "capital" doesn't trip "api".
+  const has = (w) => new RegExp(`\\b${w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`).test(text);
   let best = 'general', hits = 0;
   for (const [cat, words] of Object.entries(KEYWORDS)) {
-    const n = words.filter((w) => text.includes(w)).length;
+    const n = words.filter(has).length;
     if (n > hits) { best = cat; hits = n; }
   }
-  const urgent = /urgent|asap|down|critical|emergency|immediately/.test(text);
+  const urgent = /\b(urgent|asap|down|critical|emergency|immediately)\b/.test(text);
   return { category: best, priority: urgent ? 'urgent' : 'medium', confidence: hits ? 0.5 : 0.2, sentiment: 0 };
 }
 
 // Post-process: angry customers get bumped one level; low-confidence goes to human review.
-function finalize(ai) {
-  let priority = ai.priority;
-  if (ai.sentiment < -0.5 && LEVELS.indexOf(priority) < 2) priority = LEVELS[LEVELS.indexOf(priority) + 1];
-  return { ...ai, priority, needsReview: ai.confidence < 0.45 };
+function finalize(raw) {
+  // Never trust the ML payload: coerce to values the Ticket schema accepts.
+  const category = CATEGORIES.includes(raw.category) ? raw.category : 'general';
+  let priority = LEVELS.includes(raw.priority) ? raw.priority : 'medium';
+  const sentiment = Number.isFinite(raw.sentiment) ? raw.sentiment : 0;
+  const confidence = Number.isFinite(raw.confidence) ? raw.confidence : 0;
+  if (sentiment < -0.5 && LEVELS.indexOf(priority) < 2) priority = LEVELS[LEVELS.indexOf(priority) + 1];
+  return { ...raw, category, priority, sentiment, confidence, needsReview: confidence < 0.45 };
 }
 
 export async function classify(subject, body) {

@@ -1,11 +1,14 @@
 'use client';
+import Guard from '../../components/Guard';
 import { useEffect, useState } from 'react';
 import { api, fmtMin } from '../../lib/api';
 import { Badge, Bars } from '../../components/ui';
 
-export default function Agents() {
+function Agents() {
   const [rows, setRows] = useState(null);
-  useEffect(() => { api('/analytics/agents').then(setRows).catch(() => setRows([])); }, []);
+  const [err, setErr] = useState('');
+  useEffect(() => { api('/analytics/agents').then(setRows).catch((e) => setErr(e.message)); }, []);
+  if (err) return <p className="err">{err}</p>;
   if (!rows) return <p className="muted">Loading…</p>;
   return (
     <>
@@ -32,3 +35,5 @@ export default function Agents() {
     </>
   );
 }
+
+export default function Page() { return <Guard roles={['admin']}><Agents /></Guard>; }

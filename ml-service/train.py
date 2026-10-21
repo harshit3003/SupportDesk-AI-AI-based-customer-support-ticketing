@@ -49,7 +49,11 @@ def synthetic():
 def load_rows():
     if os.path.exists(CSV_PATH):
         with open(CSV_PATH, newline="", encoding="utf-8") as f:
-            return [(r["subject"], r["body"], r["category"], r["priority"]) for r in csv.DictReader(f)]
+            rows = [(r["subject"], r["body"], r["category"], r["priority"])
+                    for r in csv.DictReader(f)
+                    if r.get("category") and r.get("priority")]
+        if rows:
+            return rows
     return synthetic()
 
 
@@ -66,10 +70,16 @@ def train():
     os.makedirs(MODEL_DIR, exist_ok=True)
     for idx, name in ((2, "category"), (3, "priority")):
         y = [r[idx] for r in rows]
-        Xtr, Xte, ytr, yte = train_test_split(X, y, test_size=0.2, random_state=42, stratify=y)
-        pipe = make_pipe().fit(Xtr, ytr)
-        print(f"== {name} ==")
-        print(classification_report(yte, pipe.predict(Xte), zero_division=0))
+        pipe = make_pipe()
+        # Stratified hold-out only works when every class has >= 2 rows and the set is big enough.
+        counts = {c: y.count(c) for c in set(y)}
+        if len(rows) >= 20 and min(counts.values()) >= 2 and len(counts) > 1:
+            Xtr, Xte, ytr, yte = train_test_split(X, y, test_size=0.2, random_state=42, stratify=y)
+            pipe.fit(Xtr, ytr)
+            print(f"== {name} ==")
+            print(classification_report(yte, pipe.predict(Xte), zero_division=0))
+        else:
+            print(f"== {name} == (too little data for a hold-out report; training on all {len(rows)} rows)")
         pipe.fit(X, y)  # refit on everything for serving
         joblib.dump(pipe, os.path.join(MODEL_DIR, f"{name}.joblib"))
 

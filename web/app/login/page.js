@@ -10,9 +10,10 @@ export default function Login() {
   const router = useRouter();
   const submit = async () => {
     try {
-      const { token } = await api('/auth/login', { method: 'POST', body: { email, password }, auth: false });
+      const { token, user } = await api('/auth/login', { method: 'POST', body: { email, password }, auth: false });
       localStorage.setItem('token', token);
-      router.push('/');
+      localStorage.setItem('user', JSON.stringify(user));
+      router.push(user.role === 'admin' ? '/' : '/my');
     } catch (e) { setErr(e.message); }
   };
   return (

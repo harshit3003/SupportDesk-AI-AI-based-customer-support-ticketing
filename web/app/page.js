@@ -1,10 +1,11 @@
 'use client';
+import Guard from '../components/Guard';
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { api, fmtMin, fmtDate, label } from '../lib/api';
 import { Stat, Bars, Badge } from '../components/ui';
 
-export default function Overview() {
+function Overview() {
   const [o, setO] = useState(null);
   const [risk, setRisk] = useState([]);
   const [err, setErr] = useState('');
@@ -48,3 +49,5 @@ export default function Overview() {
     </>
   );
 }
+
+export default function Page() { return <Guard roles={['admin']}><Overview /></Guard>; }

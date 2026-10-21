@@ -1,14 +1,15 @@
 import { Router } from 'express';
+import mongoose from 'mongoose';
 import { Ticket } from '../models.js';
 import { auth, wrap } from '../middleware.js';
 
 const r = Router();
-r.use(auth());
+const admin = auth(['admin']);
 
 const toMin = (ms) => (ms == null ? null : Math.round((ms / 60000) * 10) / 10);
 const round2 = (x) => Math.round(x * 100) / 100;
 
-r.get('/overview', wrap(async (_req, res) => {
+r.get('/overview', admin, wrap(async (_req, res) => {
   const [byStatus, byCategory, byPriority, totals, times] = await Promise.all([
     Ticket.aggregate([{ $group: { _id: '$status', n: { $sum: 1 } } }]),
     Ticket.aggregate([{ $group: { _id: '$category', n: { $sum: 1 } } }, { $sort: { n: -1 } }]),
@@ -30,7 +31,7 @@ r.get('/overview', wrap(async (_req, res) => {
   });
 }));
 
-r.get('/sla-risk', wrap(async (_req, res) => {
+r.get('/sla-risk', admin, wrap(async (_req, res) => {
   const soon = new Date(Date.now() + 60 * 60000);
   res.json(await Ticket.find({
     status: { $in: ['open', 'pending'] },
@@ -42,9 +43,9 @@ r.get('/sla-risk', wrap(async (_req, res) => {
   }).sort({ 'sla.resolutionDue': 1 }).limit(25).populate('assignee', 'name'));
 }));
 
-r.get('/agents', wrap(async (_req, res) => {
+async function agentStats(match) {
   const rows = await Ticket.aggregate([
-    { $match: { assignee: { $ne: null } } },
+    { $match: match },
     { $group: { _id: '$assignee', assigned: { $sum: 1 },
       open: { $sum: { $cond: [{ $in: ['$status', ['open', 'pending']] }, 1, 0] } },
       resolved: { $sum: { $cond: [{ $in: ['$status', ['resolved', 'closed']] }, 1, 0] } },
@@ -57,15 +58,26 @@ r.get('/agents', wrap(async (_req, res) => {
     { $project: { name: '$u.name', assigned: 1, open: 1, resolved: 1, breaches: 1, avgFrt: 1, avgRes: 1, csat: 1, csatCount: 1 } },
     { $sort: { resolved: -1 } },
   ]);
-  res.json(rows.map((a) => ({
+  return rows.map((a) => ({
     id: a._id, name: a.name, assigned: a.assigned, open: a.open, resolved: a.resolved, breaches: a.breaches,
     slaCompliance: a.assigned ? Math.round(((a.assigned - a.breaches) / a.assigned) * 100) : 100,
     avgFirstResponseMin: toMin(a.avgFrt), avgResolutionMin: toMin(a.avgRes),
     csat: a.csat ? round2(a.csat) : null, csatCount: a.csatCount,
-  })));
+  }));
+}
+
+// Admin: whole team
+r.get('/agents', admin, wrap(async (_req, res) => {
+  res.json(await agentStats({ assignee: { $ne: null } }));
 }));
 
-r.get('/csat', wrap(async (_req, res) => {
+// Agent (or admin): own numbers only
+r.get('/me', auth(), wrap(async (req, res) => {
+  const [me] = await agentStats({ assignee: new mongoose.Types.ObjectId(req.user.id) });
+  res.json(me || { assigned: 0, open: 0, resolved: 0, breaches: 0, slaCompliance: 100, avgFirstResponseMin: null, avgResolutionMin: null, csat: null, csatCount: 0 });
+}));
+
+r.get('/csat', admin, wrap(async (_req, res) => {
   const rated = { $match: { 'csat.score': { $exists: true } } };
   const since = new Date(Date.now() - 30 * 86400000);
   const [summary, dist, trend, byCategory] = await Promise.all([

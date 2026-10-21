@@ -1,11 +1,14 @@
 'use client';
+import Guard from '../../components/Guard';
 import { useEffect, useState } from 'react';
 import { api, label } from '../../lib/api';
 import { Stat, Bars } from '../../components/ui';
 
-export default function Csat() {
+function Csat() {
   const [d, setD] = useState(null);
-  useEffect(() => { api('/analytics/csat').then(setD).catch(() => {}); }, []);
+  const [err, setErr] = useState('');
+  useEffect(() => { api('/analytics/csat').then(setD).catch((e) => setErr(e.message)); }, []);
+  if (err) return <p className="err">{err}</p>;
   if (!d) return <p className="muted">Loading…</p>;
   return (
     <>
@@ -23,3 +26,5 @@ export default function Csat() {
     </>
   );
 }
+
+export default function Page() { return <Guard roles={['admin']}><Csat /></Guard>; }
